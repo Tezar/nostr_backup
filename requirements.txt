@@ -1,0 +1,2 @@
+nostr-sdk>=0.0.5
+aiohttp>=3.9.0
