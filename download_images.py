@@ -127,7 +127,7 @@ async def download_images_from_backup(backup_path, output_dir, concurrency=10):
 
     # Extract all image URLs
     all_urls = set()
-    with open(backup_path, 'r') as f:
+    with open(backup_path, 'r', encoding='utf-8') as f:
         for line in f:
             try:
                 event = json.loads(line)
@@ -177,7 +177,7 @@ async def main():
     all_urls = set()
     event_count = 0
 
-    with open(backup_path, 'r') as f:
+    with open(backup_path, 'r', encoding='utf-8') as f:
         for line in f:
             try:
                 event = json.loads(line)
