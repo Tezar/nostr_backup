@@ -117,27 +117,45 @@ async def main():
         else:
             print("[*] No custom relays found or connection failed. Proceeding with defaults.")
 
-    # 4. Main Subscription
-    print("[*] Starting full backup (waiting for relays to complete)...")
-    # Fetch events with a 60 second timeout for EOSE
-    backup_filter = Filter().author(public_key)
-    
-    # fetch_events returns a collection of events (Events or list)
+    # 4. Paginated Fetch
+    print("[*] Starting full backup with pagination...")
     try:
-        events = await client.fetch_events(backup_filter, timedelta(seconds=60))
-        print(f"[*] Received {events.len()} events.")
-
         seen_ids = set()
         stored_count = 0
+        until_ts = None
+        page = 0
 
-        with open(output_path, "a") as f:
-            for event in events.to_vec():
-                event_id = event.id().to_hex()
-                if event_id not in seen_ids:
-                    seen_ids.add(event_id)
-                    stored_count += 1
-                    f.write(event.as_json() + "\n")
-                    
+        with open(output_path, "a", encoding="utf-8") as f:
+            while True:
+                page += 1
+                backup_filter = Filter().author(public_key)
+                if until_ts is not None:
+                    backup_filter = backup_filter.until(until_ts)
+
+                events = await client.fetch_events(backup_filter, timedelta(seconds=60))
+                batch = events.to_vec()
+
+                new_count = 0
+                oldest_ts = None
+                for event in batch:
+                    event_id = event.id().to_hex()
+                    if event_id not in seen_ids:
+                        seen_ids.add(event_id)
+                        new_count += 1
+                        f.write(event.as_json() + "\n")
+                        ts = event.created_at().as_secs()
+                        if oldest_ts is None or ts < oldest_ts:
+                            oldest_ts = ts
+
+                stored_count += new_count
+                print(f"[*] Page {page}: got {len(batch)} events, {new_count} new (total: {stored_count})")
+
+                if new_count == 0:
+                    break
+
+                # Next page: fetch events older than the oldest we've seen
+                until_ts = Timestamp.from_secs(oldest_ts)
+
         print(f"\n[+] Done! Saved {stored_count} events to {output_path}")
 
         # Download images
